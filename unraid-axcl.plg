@@ -1,0 +1,130 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+  <!ENTITY name      "axcl-driver">
+  <!ENTITY author    "ZhaiSoul">
+  <!ENTITY version   "3.6.5">
+  <!ENTITY gitURL    "https://raw.githubusercontent.com/&author;/unraid-axcl-driver/main">
+  <!ENTITY pluginURL "&gitURL;/unraid-axcl.plg">
+  <!ENTITY plugin    "/boot/config/plugins/&name;">
+  <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+  <!ENTITY packages  "/boot/config/plugins/&name;/packages">
+]>
+
+<PLUGIN  name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.12.8" support="https://forums.unraid.net/topic/154177-asustor-platform-drivers/">
+
+<CHANGES>
+
+###2023.02.18
+- Initial release
+
+</CHANGES>
+
+<FILE Name="&emhttp;/README.md">
+<INLINE>
+** axcl driver **
+
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+
+KERNEL_V=$(uname -r)
+PKGNAME="&name;-${KERNEL_V}.  "
+
+download() {
+mkdir -p &packages;/${KERNEL_V%%-*}
+if wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}" "&pkgurl;/${PKGNAME}" ; then
+  wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&pkgurl;/${PKGNAME}.md5"
+  if [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
+    echo
+    echo "-----ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR------"
+    echo "--------------------------------CHECKSUM ERROR!---------------------------------"
+    removal
+    exit 1
+  fi
+  echo
+  echo "----Successfully downloaded axcl module Package for kernel v${KERNEL_V%%-*}, please wait!----"
+else
+  echo
+  echo "--------Can't download axcl module Package for kernel v${KERNEL_V%%-*}-----------"
+  removal
+  exit 1
+fi
+}
+
+#Check if driver is already downloaded
+check() {
+if ! ls -1 &packages;/${KERNEL_V%%-*}/ | grep -q "${PKGNAME}" ; then
+  echo
+  echo "+=============================================================================="
+  echo "| WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING"
+  echo "|"
+  echo "| Don't close this window with the red 'X' in the top right corner "
+  echo "| until the 'DONE' button is displayed!"
+  echo "|"
+  echo "| WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING"
+  echo "+=============================================================================="
+  echo
+  echo "----------Downloading axcl module Package for kernel v${KERNEL_V%%-*}----------"
+  echo "---------This could take some time, please don't close this window!-----------"
+  download
+else
+  wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&pkgurl;/${PKGNAME}.md5"
+  if [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
+    download
+  fi
+  echo
+  echo "---------axcl module Package for kernel v${KERNEL_V%%-*} found locally---------"
+fi
+}
+
+#Install driver package
+install() {
+  /sbin/upgradepkg --install-new "&packages;/${KERNEL_V%%-*}/${PKGNAME}"
+}
+
+enable_module() {
+  modprobe ax_pcie_host_dev
+  modprobe ax_pcie_msg
+  modprobe ax_pcie_mmb
+  modprobe axcl_host
+  modprobe ax_pcie_p2p_rc
+}
+
+# Script main
+check
+install
+enable_module
+ 
+echo ""
+echo "+=============================================================================="
+echo "| Installation of axcl module Package for kernel v${KERNEL_V%%-*} successful, reboot to take effect."
+echo "+=============================================================================="
+echo ""
+
+exit 0
+
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+
+echo "----------------------------------------"
+echo "---Uninstalling Nvidia driver package---"
+echo "----------------------------------------"
+# Remove plugin related files
+removepkg &name;-&version;
+crontab -l | grep -v '/usr/local/emhttp/plugins/axcl-driver/include/update-check.sh &amp;&gt;/dev/null 2&gt;&amp;1'  | crontab -
+rm -rf /usr/local/emhttp/plugins/&name;
+rm -rf &plugin;
+echo
+echo "--------------------------------------------------------------------------------"
+echo "-------------Nvidia Driver uninstalled, please reboot your server!--------------"
+echo "--------------------------------------------------------------------------------"
+echo
+
+</INLINE>
+</FILE>
+</PLUGIN>
