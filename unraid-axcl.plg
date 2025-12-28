@@ -85,6 +85,10 @@ install() {
 }
 
 enable_module() {
+  depmod -a
+  chmod +x /usr/bin/axcl/*
+  export PATH=$PATH:/usr/bin/axcl:/usr/bin/axcl/ut
+
   modprobe ax_pcie_host_dev
   modprobe ax_pcie_msg
   modprobe ax_pcie_mmb
