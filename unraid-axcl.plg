@@ -30,7 +30,7 @@
 <INLINE>
 
 KERNEL_V=$(uname -r)
-PKGNAME="&name;-${KERNEL_V}.  "
+PKGNAME="&name;-${KERNEL_V}.tgz"
 
 download() {
 mkdir -p &packages;/${KERNEL_V%%-*}
