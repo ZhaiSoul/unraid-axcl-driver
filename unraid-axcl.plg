@@ -34,10 +34,23 @@ PKGNAME="&name;-${KERNEL_V}.tgz"
 
 download() {
 mkdir -p &packages;/${KERNEL_V%%-*}
-echo "Download URL: &gitURL;/packages/${PKGNAME}"
-if wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}" "&gitURL;/packages/${PKGNAME}" ; then
-  wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&gitURL;/packages/${PKGNAME}.md5"
-  if [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
+DOWNLOAD_URL="&gitURL;/packages/${PKGNAME}"
+echo
+echo "---- Download Information ----"
+echo "Kernel Version: ${KERNEL_V}"
+echo "Package Name: ${PKGNAME}"
+echo "Download URL: ${DOWNLOAD_URL}"
+echo "Target Path: &packages;/${KERNEL_V%%-*}/${PKGNAME}"
+echo "------------------------------"
+echo
+
+# Try to download with detailed error output
+HTTP_CODE=$(curl -sL -o "&packages;/${KERNEL_V%%-*}/${PKGNAME}" -w "%{http_code}" "${DOWNLOAD_URL}" 2>&1)
+
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "Download successful (HTTP $HTTP_CODE)"
+  curl -sL -o "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&gitURL;/packages/${PKGNAME}.md5"
+  if [ -f "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" ] && [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
     echo
     echo "-----ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR------"
     echo "--------------------------------CHECKSUM ERROR!---------------------------------"
@@ -48,7 +61,14 @@ if wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KE
   echo "----Successfully downloaded axcl module Package for kernel v${KERNEL_V%%-*}, please wait!----"
 else
   echo
-  echo "--------Can't download axcl module Package for kernel v${KERNEL_V%%-*}-----------"
+  echo "--------Download failed! HTTP Code: $HTTP_CODE -----------"
+  echo "--------URL: ${DOWNLOAD_URL}"
+  echo "--------Kernel v${KERNEL_V%%-*} package not found."
+  echo
+  echo "Possible reasons:"
+  echo "  1. Package file not uploaded to GitHub repository"
+  echo "  2. File path is incorrect"
+  echo "  3. Network connectivity issues"
   removal
   exit 1
 fi
