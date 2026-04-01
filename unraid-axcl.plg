@@ -137,16 +137,29 @@ exit 0
 <INLINE>
 
 echo "----------------------------------------"
-echo "---Uninstalling Nvidia driver package---"
+echo "----Uninstalling axcl driver package----"
 echo "----------------------------------------"
+
+# Unload kernel modules (reverse order of loading)
+modprobe -r ax_pcie_p2p_rc 2>/dev/null
+modprobe -r axcl_host 2>/dev/null
+modprobe -r ax_pcie_mmb 2>/dev/null
+modprobe -r ax_pcie_msg 2>/dev/null
+modprobe -r ax_pcie_host_dev 2>/dev/null
+
+echo "Kernel modules unloaded."
+
+# Remove installed package
+removepkg &name;-&version; 2>/dev/null
+
 # Remove plugin related files
-removepkg &name;-&version;
-crontab -l | grep -v '/usr/local/emhttp/plugins/axcl-driver/include/update-check.sh &amp;&gt;/dev/null 2&gt;&amp;1'  | crontab -
 rm -rf /usr/local/emhttp/plugins/&name;
 rm -rf &plugin;
+
+# Clean up PATH (note: this only affects current session)
 echo
 echo "--------------------------------------------------------------------------------"
-echo "-------------Nvidia Driver uninstalled, please reboot your server!--------------"
+echo "-------------axcl Driver uninstalled, please reboot your server!---------------"
 echo "--------------------------------------------------------------------------------"
 echo
 
