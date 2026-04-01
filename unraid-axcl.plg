@@ -45,12 +45,12 @@ echo "------------------------------"
 echo
 
 # Try to download with detailed error output
-HTTP_CODE=$(curl -sL -o "&packages;/${KERNEL_V%%-*}/${PKGNAME}" -w "%{http_code}" "${DOWNLOAD_URL}" 2>&1)
+HTTP_CODE=$(curl -sL -o "&packages;/${KERNEL_V%%-*}/${PKGNAME}" -w "%{http_code}" "${DOWNLOAD_URL}" 2>&amp;1)
 
 if [ "$HTTP_CODE" = "200" ]; then
   echo "Download successful (HTTP $HTTP_CODE)"
   curl -sL -o "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&gitURL;/packages/${PKGNAME}.md5"
-  if [ -f "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" ] && [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
+  if [ -f "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" ] &amp;&amp; [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
     echo
     echo "-----ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR - ERROR------"
     echo "--------------------------------CHECKSUM ERROR!---------------------------------"
