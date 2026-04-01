@@ -34,6 +34,7 @@ PKGNAME="&name;-${KERNEL_V}.tgz"
 
 download() {
 mkdir -p &packages;/${KERNEL_V%%-*}
+echo "Download URL: &gitURL;/${PKGNAME}"
 if wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}" "&gitURL;/${PKGNAME}" ; then
   wget -q -nc --show-progress --progress=bar:force:noscroll -O "&packages;/${KERNEL_V%%-*}/${PKGNAME}.md5" "&gitURL;/${PKGNAME}.md5"
   if [ "$(md5sum &packages;/${KERNEL_V%%-*}/${PKGNAME} | awk '{print $1}')" != "$(cat &packages;/${KERNEL_V%%-*}/${PKGNAME}.md5 | awk '{print $1}')" ]; then
