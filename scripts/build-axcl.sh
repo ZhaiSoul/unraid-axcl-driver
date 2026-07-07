@@ -36,7 +36,10 @@ if ! wget -q --show-progress -O "${BUILD_DIR}/${KERNEL_TARBALL}" "${KERNEL_URL}"
 fi
 
 echo "  Extracting kernel source..."
-tar xf "${BUILD_DIR}/${KERNEL_TARBALL}" -C "${BUILD_DIR}"
+mkdir -p "${KERNEL_SRC}"
+# The tarball may or may not have a top-level directory, handle both
+tar xf "${BUILD_DIR}/${KERNEL_TARBALL}" -C "${KERNEL_SRC}" --strip-components=1 2>/dev/null || \
+tar xf "${BUILD_DIR}/${KERNEL_TARBALL}" -C "${KERNEL_SRC}"
 rm -f "${BUILD_DIR}/${KERNEL_TARBALL}"
 
 if [ ! -f "${KERNEL_SRC}/.config" ]; then
