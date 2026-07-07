@@ -11,7 +11,7 @@ set -e
 
 KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION required}"
 AXCL_DEB_URL="${AXCL_DEB_URL:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb}"
-WORKDIR="${GITHUB_WORKSPACE:-/workspace}"
+WORKDIR="${GITHUB_WORKSPACE:-$(pwd)}"
 BUILD_DIR="/tmp/axcl-build"
 KERNEL_SRC="${BUILD_DIR}/linux-${KERNEL_VERSION}"
 AXCL_SRC="${BUILD_DIR}/axcl_source"
