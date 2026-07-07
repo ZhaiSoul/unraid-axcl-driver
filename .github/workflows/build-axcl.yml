@@ -1,0 +1,130 @@
+name: Build AXCL Driver
+
+on:
+  schedule:
+    # Run daily at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Specific kernel version (e.g. 6.18.35-Unraid), leave empty for auto-detect'
+        required: false
+        type: string
+      axcl_deb_url:
+        description: 'AXCL .deb download URL'
+        required: false
+        type: string
+        default: 'https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ich777/unraid_kernel:gcc_14.2.0
+      # The container runs as root, but actions/checkout creates files
+      # owned by the runner user. We need to handle this.
+      options: --user root
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine kernel versions to build
+        id: detect
+        run: |
+          #!/bin/bash
+          set -e
+
+          # If manual trigger with specific version
+          if [ -n "${{ inputs.kernel_version }}" ]; then
+            echo "kernels=[\"${{ inputs.kernel_version }}\"]" >> $GITHUB_OUTPUT
+            echo "manual=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Auto-detect: get latest upstream releases and compare with existing packages
+          echo "Fetching upstream releases from ich777/unraid_kernel..."
+          UPSTREAM_TAGS=$(curl -sL "https://api.github.com/repos/ich777/unraid_kernel/releases?per_page=10" | \
+            python3 -c "
+  import json, sys
+  for r in json.load(sys.stdin):
+      print(r['tag_name'])
+  ")
+
+          # Get already-built kernel versions from packages/
+          BUILT_VERSIONS=$(ls packages/axcl-driver-*.tgz 2>/dev/null | sed 's/packages\/axcl-driver-//' | sed 's/\.tgz//' || true)
+
+          NEW_KERNELS=()
+          for tag in ${UPSTREAM_TAGS}; do
+            if echo "${BUILT_VERSIONS}" | grep -qF "${tag}"; then
+              echo "  [SKIP] ${tag} - already built"
+            else
+              echo "  [NEW]  ${tag} - will build"
+              NEW_KERNELS+=("${tag}")
+            fi
+          done
+
+          if [ ${#NEW_KERNELS[@]} -eq 0 ]; then
+            echo "No new kernel versions found. Nothing to build."
+            echo "kernels=[]" >> $GITHUB_OUTPUT
+          else
+            # Build all new versions (max 3 to avoid excessive runtime)
+            KERNELS_JSON=$(printf '%s\n' "${NEW_KERNELS[@]:0:3}" | python3 -c "import sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))")
+            echo "kernels=${KERNELS_JSON}" >> $GITHUB_OUTPUT
+          fi
+          echo "manual=false" >> $GITHUB_OUTPUT
+
+      - name: Build AXCL drivers
+        if: steps.detect.outputs.kernels != '[]' && steps.detect.outputs.kernels != ''
+        shell: bash
+        env:
+          AXCL_DEB_FALLBACK: 'https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb'
+        run: |
+          set -e
+          AXCL_DEB_URL="${{ inputs.axcl_deb_url }}"
+          AXCL_DEB_URL="${AXCL_DEB_URL:-$AXCL_DEB_FALLBACK}"
+          chmod +x scripts/build-axcl.sh
+          KERNELS='${{ steps.detect.outputs.kernels }}'
+          KERNEL_ARRAY=($(echo "${KERNELS}" | python3 -c "import json,sys; [print(k) for k in json.load(sys.stdin)]"))
+          for KVER in "${KERNEL_ARRAY[@]}"; do
+            echo ""
+            echo "##################################################"
+            echo "# Building for kernel: ${KVER}"
+            echo "##################################################"
+            export KERNEL_VERSION="${KVER}"
+            export AXCL_DEB_URL="${AXCL_DEB_URL}"
+            bash scripts/build-axcl.sh
+          done
+
+      - name: Commit and push new packages
+        if: steps.detect.outputs.kernels != '[]' && steps.detect.outputs.kernels != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          #!/bin/bash
+          set -e
+
+          # Fix git safe.directory for container/runner uid mismatch
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+          # Check if there are new package files to commit
+          cd "$GITHUB_WORKSPACE"
+          git add packages/
+          
+          if git diff --cached --quiet; then
+            echo "No new files to commit."
+            exit 0
+          fi
+
+          echo "New files to commit:"
+          git diff --cached --name-only
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          KERNELS='${{ steps.detect.outputs.kernels }}'
+          KVER_LIST=$(echo "${KERNELS}" | python3 -c "import json,sys; print(', '.join(json.load(sys.stdin)))")
+          git commit -m "auto: build AXCL driver for ${KVER_LIST}"
+
+          git push origin main
