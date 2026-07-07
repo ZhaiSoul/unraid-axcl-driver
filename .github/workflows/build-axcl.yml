@@ -18,29 +18,27 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/ich777/unraid_kernel:gcc_14.2.0
-      options: --user root
     permissions:
       contents: write
     steps:
+      # Step 1: Checkout on host runner (Slackware container lacks libnghttp3)
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Determine kernel versions to build (runs on host runner)
       - name: Determine kernel versions to build
         id: detect
         run: |
           set -e
 
-          # If manual trigger with specific version
           if [ -n "${{ inputs.kernel_version }}" ]; then
-            KERNELS_JSON="[\"${{ inputs.kernel_version }}\"]"
-            echo "kernels=${KERNELS_JSON}" >> $GITHUB_OUTPUT
+            echo "kernels=[\"${{ inputs.kernel_version }}\"]" >> $GITHUB_OUTPUT
             echo "manual=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           echo "Fetching upstream releases from ich777/unraid_kernel..."
+          chmod +x scripts/detect-kernels.sh
           curl -sL "https://api.github.com/repos/ich777/unraid_kernel/releases?per_page=10" | \
             python3 -c "import json,sys; [print(r['tag_name']) for r in json.load(sys.stdin)]" | \
             bash scripts/detect-kernels.sh > /tmp/kernels.json
@@ -49,33 +47,38 @@ jobs:
           echo "kernels=${KERNELS_JSON}" >> $GITHUB_OUTPUT
           echo "manual=false" >> $GITHUB_OUTPUT
 
-      - name: Build AXCL drivers
+      # Step 3: Build drivers inside Slackware container via docker run
+      - name: Build AXCL drivers in container
         if: steps.detect.outputs.kernels != '[]' && steps.detect.outputs.kernels != ''
-        shell: bash
-        env:
-          AXCL_DEB_DEFAULT: 'https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb'
         run: |
           set -e
-          chmod +x scripts/build-axcl.sh
-          AXCL_DEB_URL="${{ inputs.axcl_deb_url }}"
-          AXCL_DEB_URL="${AXCL_DEB_URL:-$AXCL_DEB_DEFAULT}"
-          KERNELS_JSON='${{ steps.detect.outputs.kernels }}'
-          python3 -c "import json,sys; [print(k) for k in json.loads('${KERNELS_JSON}')]" | while read -r KVER; do
-            echo ""
-            echo "=== Building for kernel: ${KVER} ==="
-            export KERNEL_VERSION="${KVER}"
-            export AXCL_DEB_URL="${AXCL_DEB_URL}"
-            bash scripts/build-axcl.sh
-          done
+          AXCL_DEB="${{ inputs.axcl_deb_url }}"
+          AXCL_DEB="${AXCL_DEB:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb}"
+          WS="${{ github.workspace }}"
 
+          printf '%s\n' '${{ steps.detect.outputs.kernels }}' > /tmp/kernels_raw.json
+          KERNEL_LIST=$(python3 -c "import json; [print(k) for k in json.load(open('/tmp/kernels_raw.json'))]")
+
+          while IFS= read -r KVER; do
+            [ -z "$KVER" ] && continue
+            echo ""
+            echo "=== Building AXCL driver for kernel: ${KVER} ==="
+            docker run --rm --platform linux/amd64 \
+              -v "${WS}:${WS}" \
+              -w "${WS}" \
+              -e KERNEL_VERSION="${KVER}" \
+              -e AXCL_DEB_URL="${AXCL_DEB}" \
+              --entrypoint bash \
+              ghcr.io/ich777/unraid_kernel:gcc_14.2.0 \
+              scripts/build-axcl.sh
+          done <<< "$KERNEL_LIST"
+
+      # Step 4: Commit and push (host runner)
       - name: Commit and push new packages
         if: steps.detect.outputs.kernels != '[]' && steps.detect.outputs.kernels != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          cd "$GITHUB_WORKSPACE"
+          cd "${{ github.workspace }}"
           git add packages/
 
           if git diff --cached --quiet; then
@@ -89,7 +92,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          KERNELS_JSON='${{ steps.detect.outputs.kernels }}'
-          KVER_LIST=$(python3 -c "import json,sys; print(', '.join(json.loads('${KERNELS_JSON}')))")
+          KVER_LIST=$(python3 -c "import json; print(', '.join(json.load(open('/tmp/kernels_raw.json'))))")
           git commit -m "auto: build AXCL driver for ${KVER_LIST}"
           git push origin main
