@@ -83,10 +83,10 @@ echo "[4/6] Applying build patches..."
 KRULES_MAK="${AXCL_SRC}/usr/src/axcl/build/projects/axcl_linux_x86_krules.mak"
 
 # Patch 1: Fix hostname command not found in Slackware
-sed -i 's|$(shell hostname)|$(shell hostname 2>/dev/null || echo unknown)|g' "${KRULES_MAK}"
+sed -i 's#$(shell hostname)#$(shell hostname 2>/dev/null || echo unknown)#g' "${KRULES_MAK}"
 
 # Patch 2: Suppress date-time warnings that become errors with GCC 15 + CONFIG_WERROR
-sed -i 's|KCFLAGS\s*+=\s*-DIS_THIRD_PARTY_PLATFORM|KCFLAGS += -DIS_THIRD_PARTY_PLATFORM -Wno-error=date-time -Wno-date-time|' "${KRULES_MAK}"
+sed -i 's#KCFLAGS\s*+=\s*-DIS_THIRD_PARTY_PLATFORM#KCFLAGS += -DIS_THIRD_PARTY_PLATFORM -Wno-error=date-time -Wno-date-time#' "${KRULES_MAK}"
 
 echo "  Patches applied successfully."
 
