@@ -10,7 +10,7 @@ set -e
 # ============================================================
 
 KERNEL_VERSION="${KERNEL_VERSION:?KERNEL_VERSION required}"
-AXCL_DEB_URL="${AXCL_DEB_URL:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb}"
+AXCL_DEB_URL="${AXCL_DEB_URL:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/V3.16.0_16G/axcl_host_x86_64_V3.16.0_20260729180218_NO26582.deb}"
 WORKDIR="${GITHUB_WORKSPACE:-$(pwd)}"
 BUILD_DIR="/tmp/axcl-build"
 KERNEL_SRC="${BUILD_DIR}/linux-${KERNEL_VERSION}"
@@ -81,12 +81,20 @@ echo ""
 echo "[4/6] Applying build patches..."
 
 KRULES_MAK="${AXCL_SRC}/usr/src/axcl/build/projects/axcl_linux_x86_krules.mak"
+HOST_DEV_C="${AXCL_SRC}/usr/src/axcl/drv/pcie/driver/host_dev/ax_pcie_dev_host.c"
 
 # Patch 1: Fix hostname command not found in Slackware
 sed -i 's#$(shell hostname)#$(shell hostname 2>/dev/null || echo unknown)#g' "${KRULES_MAK}"
 
 # Patch 2: Suppress date-time warnings that become errors with GCC 15 + CONFIG_WERROR
 sed -i 's#KCFLAGS\s*+=\s*-DIS_THIRD_PARTY_PLATFORM#KCFLAGS += -DIS_THIRD_PARTY_PLATFORM -Wno-error=date-time -Wno-date-time#' "${KRULES_MAK}"
+
+# Patch 3: The driver switches to the 4-argument pci_resize_resource() only for
+# LINUX_VERSION_CODE >= 6.19.0, while the 6.18 stable branch carries that same
+# signature from 6.18.40 on
+if grep -q 'exclude_bars' "${KERNEL_SRC}/include/linux/pci.h"; then
+    sed -i 's#KERNEL_VERSION(6, 19, 0)#KERNEL_VERSION(6, 18, 40)#' "${HOST_DEV_C}"
+fi
 
 echo "  Patches applied successfully."
 

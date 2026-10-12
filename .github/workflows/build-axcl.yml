@@ -13,7 +13,7 @@ on:
         description: 'AXCL .deb download URL'
         required: false
         type: string
-        default: 'https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb'
+        default: 'https://huggingface.co/AXERA-TECH/AXCL/resolve/main/V3.16.0_16G/axcl_host_x86_64_V3.16.0_20260729180218_NO26582.deb'
 
 jobs:
   build:
@@ -53,7 +53,7 @@ jobs:
         run: |
           set -e
           AXCL_DEB="${{ inputs.axcl_deb_url }}"
-          AXCL_DEB="${AXCL_DEB:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/v3.10.2/axcl_host_x86_64_V3.10.2_20251111020143_NO5046.deb}"
+          AXCL_DEB="${AXCL_DEB:-https://huggingface.co/AXERA-TECH/AXCL/resolve/main/V3.16.0_16G/axcl_host_x86_64_V3.16.0_20260729180218_NO26582.deb}"
           WS="${{ github.workspace }}"
 
           printf '%s\n' '${{ steps.detect.outputs.kernels }}' > /tmp/kernels_raw.json
